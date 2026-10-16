@@ -64,3 +64,12 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 @app.get("/", include_in_schema=False)
 def index():
     return FileResponse(FRONTEND_DIR / "index.html")
+
+@app.get("/diagnostics/dify")
+def dify_diagnostics():
+    """Return non-secret configuration status for deployment troubleshooting."""
+    key = os.getenv("DIFY_API_KEY", "").strip()
+    return {
+        "key_configured": bool(key) and not key.startswith("replace-"),
+        "base_url_configured": bool(os.getenv("DIFY_BASE_URL", "").strip()),
+    }
