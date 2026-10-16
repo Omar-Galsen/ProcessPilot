@@ -52,3 +52,15 @@ async def chat(p: ChatRequest):
             return {"answer": data.get("answer", ""), "conversation_id": data.get("conversation_id", "")}
     except httpx.HTTPError:
         raise HTTPException(502, "Dify service unavailable")
+
+# Serve the web app and API from the same public origin.
+from pathlib import Path
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(FRONTEND_DIR / "index.html")
