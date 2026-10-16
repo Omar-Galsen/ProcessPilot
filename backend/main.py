@@ -13,6 +13,8 @@ app.add_middleware(CORSMiddleware, allow_origins=[os.getenv("FRONTEND_ORIGIN", "
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: str = ""
+    mode: str = Field(default="teach", pattern="^(teach|quiz|guided)$")
+    topic: str = Field(default="General chemical engineering", max_length=100)
 
 class PipeRequest(BaseModel):
     length_m: float = Field(gt=0)
@@ -44,9 +46,15 @@ async def chat(p: ChatRequest):
     if not key or key.startswith("replace-"):
         raise HTTPException(503, "Configure DIFY_API_KEY")
     base = os.getenv("DIFY_BASE_URL", "http://localhost/v1").rstrip("/")
+    instructions = {
+        "teach": "Act as a patient chemical engineering tutor. Explain the concept in small steps, define variables and units, give a worked example, and finish with one comprehension question.",
+        "quiz": "Act as a chemical engineering quiz tutor. Ask ONE question at a time, wait for the learner's answer, then give feedback and a follow-up question. Do not reveal the answer before the student tries.",
+        "guided": "Act as a Socratic chemical engineering tutor. Help solve the problem with one hint or question at a time. Avoid giving the full solution unless explicitly requested."
+    }
+    guided_question = f"[Learning mode: {p.mode}; topic: {p.topic}] {instructions[p.mode]}\\nStudent: {p.question}"
     try:
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(f"{base}/chat-messages", headers={"Authorization": f"Bearer {key}"}, json={"inputs": {}, "query": p.question, "response_mode": "blocking", "conversation_id": p.conversation_id, "user": "local-demo"})
+            response = await client.post(f"{base}/chat-messages", headers={"Authorization": f"Bearer {key}"}, json={"inputs": {}, "query": guided_question, "response_mode": "blocking", "conversation_id": p.conversation_id, "user": "local-demo"})
             response.raise_for_status()
             data = response.json()
             return {"answer": data.get("answer", ""), "conversation_id": data.get("conversation_id", "")}
